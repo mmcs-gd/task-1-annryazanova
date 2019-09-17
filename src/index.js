@@ -22,6 +22,7 @@ function draw(tFrame) {
 
     drawPlatform(context)
     drawBall(context)
+    drawscore(context)
 }
 
 function update(tick) {
@@ -31,7 +32,11 @@ function update(tick) {
 
     const ball = gameState.ball
     ball.y += ball.vy
-    ball.y += ball.vx
+    ball.x += ball.vx
+
+    const score = gameState.score
+    score.value += 1
+    checkGameEnd();
 }
 
 function run(tFrame) {
@@ -71,6 +76,19 @@ function drawBall(context) {
     context.closePath();
 }
 
+function drawscore(context) {
+    const {x, y, width, height, value} = gameState.score;
+    context.beginPath();
+    context.rect(x, y, width, height);
+    context.fillStyle = "#7573D9";
+    context.fill();
+    context.fillStyle = "#FFFFFF";
+    context.textAlign = "center";
+    context.font = "18px serif";
+    context.fillText(value, x + width / 2, y + height / 2 + 5);
+    context.closePath();
+}
+
 function setup() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -90,7 +108,7 @@ function setup() {
         x: 100,
         y: canvas.height - platform.height / 2,
         width: platform.width,
-        height: platform.height
+        height: platform.height,
     };
     gameState.pointer = {
         x: 0,
@@ -101,7 +119,21 @@ function setup() {
         y: 0,
         radius: 25,
         vx: 0,
-        vy: 5
+        vy: 5,
+    };
+    gameState.score = {
+        x : 5,
+        y : 5,
+        width : 100,
+        height : 36,
+        value : 0,
+    }
+}
+
+function checkGameEnd() {
+    const ball = gameState.ball
+    if (ball.y >= canvas.height + ball.radius) {
+        stopGame(gameState.stopCycle);
     }
 }
 
