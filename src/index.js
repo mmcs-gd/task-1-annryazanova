@@ -2,6 +2,14 @@ const canvas = document.getElementById("cnvs");
 
 const gameState = {};
 
+const directionType = {
+	none: 0,
+	down: 1,
+	up: 2,
+	left: 3,
+	right: 4,
+}
+
 function onMouseMove(e) {
     gameState.pointer.x = e.pageX;
     gameState.pointer.y = e.pageY
@@ -35,7 +43,22 @@ function update(tick) {
     ball.x += ball.vx
 
     const score = gameState.score
-    score.value += 1
+	
+	// update score every 1 second
+	if (gameState.lastTick - score.lastSave > 1000) {
+		score.value += 1
+		score.lastSave = gameState.lastTick
+	}
+	
+	// update ball speed every 30 seconds
+	if (gameState.lastTick - ball.lastSpeedIncrease > 30000) {
+		ball.vx += ball.vx * .1;
+		ball.vy += ball.vy * .1;
+		ball.lastSpeedIncrease = gameState.lastTick;
+	}
+	
+	checkPlayerCollision(ball);
+	checkTopCollision(ball);
     checkGameEnd();
 }
 
@@ -85,7 +108,7 @@ function drawscore(context) {
     context.fillStyle = "#FFFFFF";
     context.textAlign = "center";
     context.font = "18px serif";
-    context.fillText(value, x + width / 2, y + height / 2 + 5);
+    context.fillText(value, x + width / 2, y + height / 2 + 5); 
     context.closePath();
 }
 
@@ -120,6 +143,8 @@ function setup() {
         radius: 25,
         vx: 0,
         vy: 5,
+		direction: directionType.down,
+		lastSpeedIncrease : 0,
     };
     gameState.score = {
         x : 5,
@@ -127,14 +152,36 @@ function setup() {
         width : 100,
         height : 36,
         value : 0,
+		lastSave: 0,
     }
 }
 
+// check bottom collision and finish game
 function checkGameEnd() {
     const ball = gameState.ball
     if (ball.y >= canvas.height + ball.radius) {
         stopGame(gameState.stopCycle);
     }
+}
+
+function checkPlayerCollision(ball){
+	player = gameState.player;
+	leftPlatformPart = player.x - player.width / 2;
+	rightPlatformPart = player.x + player.width / 2
+	if (ball.y + ball.radius >= player.y && 
+	ball.x > leftPlatformPart && 
+	ball.x < rightPlatformPart) {
+		ball.vy *= (-1);
+		ball.direction = directionType.up;
+	}
+}
+
+function checkTopCollision(ball){
+	if (ball.y - ball.radius <= 0 &&
+		ball.direction != directionType.down){
+		ball.vy *= (-1);
+		ball.direction = directionType.down;
+	}
 }
 
 setup();
