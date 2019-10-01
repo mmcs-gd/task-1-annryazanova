@@ -2,14 +2,6 @@ const canvas = document.getElementById("cnvs");
 
 const gameState = {};
 
-const directionType = {
-	none: 0,
-	down: 1,
-	up: 2,
-	left: 3,
-	right: 4,
-};
-
 function onMouseMove(e) {
     gameState.pointer.x = e.pageX;
     gameState.pointer.y = e.pageY;
@@ -32,7 +24,7 @@ function draw(tFrame) {
     drawBall(context);
     drawScore(context);
 	drawBonus(context);
-	//drawDebugInfo(context);
+	drawDebugInfo(context);
 }
 
 function update(tick) {
@@ -62,23 +54,19 @@ function update(tick) {
     const bonus = gameState.bonus
 	
 	// create bonus in random place every 15 seconds
-	if (gameState.lastTick - bonus.lastInstance > 15000) {
-		bonus.x = getRandomIntInclusive(0, canvas.width); 
-		bonus.y = getRandomIntInclusive(0, canvas.height / 2); 
-		bonus.vx = getRandomIntInclusive(-5, 5);
-		bonus.vy = getRandomIntInclusive(1, 5);
+	if (gameState.lastTick - bonus.lastInstance > 15000 && !bonus.isCreated) { 
 		bonus.radius = getRandomIntInclusive(10, 20);
+		bonus.x = getRandomIntInclusive(0 + bonus.radius, canvas.width - bonus.radius); 
+		bonus.y = getRandomIntInclusive(0 + bonus.radius, canvas.height / 2); 
+		bonus.vx = getRandomIntInclusive(-7, 7);
+		bonus.vy = getRandomIntInclusive(1, 5);
 		bonus.width = getRandomIntInclusive(5, 10);
 		bonus.isCreated = true; 
 		bonus.lastInstance = gameState.lastTick;
 	}
 	
     checkGameEnd();
-	checkPlayerCollision(ball, function() {
-		ball.vy *= (-1);
-		ball.direction = directionType.up;
-	});
-	checkTopCollision(ball);
+	checkBallState();
 	checkBonusState();
 }
 
@@ -105,7 +93,7 @@ function drawPlatform(context) {
     const {x, y, width, height} = gameState.player;
     context.beginPath();
     context.rect(x - width / 2, y - height / 2, width, height);
-    context.fillStyle = "#FF0000";
+    context.fillStyle = "#9FEE00";
     context.fill();
     context.closePath();
 }
@@ -114,7 +102,7 @@ function drawBall(context) {
     const {x, y, radius} = gameState.ball;
     context.beginPath();
     context.arc(x, y, radius, 0, 2 * Math.PI);
-    context.fillStyle = "#0000FF";
+    context.fillStyle = "#162EAE";
     context.fill();
     context.closePath();
 }
@@ -123,7 +111,7 @@ function drawScore(context) {
     const {x, y, width, height, value} = gameState.score;
     context.beginPath();
     context.rect(x, y, width, height);
-    context.fillStyle = "#7573D9";
+    context.fillStyle = "#CD0074";
     context.fill();
     context.fillStyle = "#FFFFFF";
     context.textAlign = "center";
@@ -138,7 +126,7 @@ function drawBonus(context) {
 		context.beginPath();
 		context.rect(x - radius, y - width / 2, 2 * radius, width);
 		context.rect(x - width / 2, y - radius, width, 2 * radius);
-		context.fillStyle = "#FFFF00";
+		context.fillStyle = "#FFB600";
 		context.fill();
 		context.closePath();		
 	}
@@ -148,7 +136,7 @@ function drawDebugInfo(context) {
     context.fillStyle = "#000000";
     context.textAlign = "left";
     context.font = "18px serif";
-    context.fillText("vx: " + gameState.bonus.vx + ", vy: " + gameState.bonus.vy + ", y: " + gameState.bonus.y, 5, 60);	
+    //context.fillText("vx: " + gameState.bonus.vx + ", vy: " + gameState.bonus.vy + ", x: " + gameState.bonus.x + ", y: " + gameState.bonus.y, 5, 60);	
 }
 
 function setup() {
@@ -182,8 +170,8 @@ function setup() {
         radius: 25,
         vx: 0,
         vy: 5,
-		direction: directionType.down,
 		lastSpeedIncrease: 0,
+		isInitializedVx: false,
     };
     gameState.score = {
         x: 5,
@@ -213,27 +201,46 @@ function checkGameEnd() {
 	});
 }
 
-function checkPlayerCollision(obj, callback){
+function checkPlatformCollision(obj, checkRebound, callback){
 	player = gameState.player;
 	leftPlatformPart = player.x - player.width / 2;
 	rightPlatformPart = player.x + player.width / 2
-	if (obj.y + obj.radius >= player.y && 
-	obj.x > leftPlatformPart && 
-	obj.x < rightPlatformPart) {
+	if (obj.y + obj.radius >= player.y - player.height / 2 && 
+	obj.y < player.y - player.height / 2 &&
+	obj.x >= leftPlatformPart && 
+	obj.x <= rightPlatformPart){  
+		// if it's needed to check rebound from the platform
+		if (checkRebound) {
+			if (!obj.isInitializedVx){	
+				if (obj.x >= leftPlatformPart && obj.x <= player.x && obj.vx >= 0) {   		// rebound from the left part of the platform
+					obj.vx = getRandomIntInclusive(-7, -2);
+					obj.isInitializedVx = true;
+				} else if (obj.x <= rightPlatformPart && obj.x > player.x && obj.vx >= 0) {  // rebound from the right part of the platform
+					obj.vx = getRandomIntInclusive(2, 7);
+					obj.isInitializedVx = true;
+				} 
+			}
+		}
 		callback();
 	}
 }
 
 function checkTopCollision(ball){
 	if (ball.y - ball.radius <= 0 &&
-		ball.direction != directionType.down){
+		ball.vy < 0){
 		ball.vy *= (-1);
-		ball.direction = directionType.down;
 	}
 }
 
 function checkBottomCollision(obj, callback){
 	if (obj.y >= canvas.height + obj.radius) {
+        callback();		
+    }
+}
+
+function checkWallCollision(obj, callback){
+	if (obj.x <= 0 + obj.radius ||				 // left wall
+		obj.x >= canvas.width - obj.radius) {	 // right wall
         callback();		
     }
 }
@@ -252,13 +259,30 @@ function checkBonusState(){
 	}
 }
 
+function checkBallState(){
+	ball = gameState.ball;
+	
+	checkPlatformCollision(ball, true, function() {
+		ball.vy *= (-1);
+	});
+	
+	checkTopCollision(ball);
+	checkWallCollision(ball, function(){
+		ball.vx *= (-1);
+	});
+}
+
 function updateBonusPosition(bonus){
 	bonus.y += bonus.vy;
-	bonus.x += bonus.vx; // TO DO: исправить выход за границы экрана -> отскок от левой и правой стен
+	bonus.x += bonus.vx; 
 	
-	checkPlayerCollision(bonus, function() {
+	checkPlatformCollision(bonus, false, function() {
 		gameState.score.value += 15;
 		bonus.isCreated = false;
+	});
+	
+	checkWallCollision(bonus, function(){
+		gameState.bonus.vx *= (-1);
 	});
 	
 	checkBottomCollision(bonus, function() {
